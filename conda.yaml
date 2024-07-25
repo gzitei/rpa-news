@@ -1,0 +1,14 @@
+name: pyrpanews
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.10.14
+  - pip
+  - pip:
+      - rpaframework==28.6.1
+      - selenium==4.15.2
+      - python-slugify==8.0.4
+      - requests==2.31.0
+      - truststore==0.9.1
+      - autopep8==2.3.1
