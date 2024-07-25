@@ -396,15 +396,12 @@ class Robot(Bot):
                 }
             }
             Robot.LOGGER.debug("Browser options set up.")
-            self.driver.open_browser(
+            self.driver.open_available_browser(
                 url=self.url,
-                alias="MAIN",
-                browser="chrome",
+                maximized=True,
                 options=opts
             )
             Robot.LOGGER.debug("Browser opened")
-            self.driver.maximize_browser_window()
-            Robot.LOGGER.debug("Browser maximized")
             time.sleep(Timeouts.SECOND_10.value)
             assert self.__validate_url()
             Robot.LOGGER.debug("Browser URL validated")
