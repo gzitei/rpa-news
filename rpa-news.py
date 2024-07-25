@@ -13,14 +13,11 @@ from RPA.Browser.Selenium import Selenium
 from RPA.Excel.Files import Files
 from enum import Enum
 from dateutil.relativedelta import relativedelta
-load_dotenv('config.env')
+load_dotenv("config.env")
 
 
 class Dirs(Enum):
     OUTPUT = "output"
-    LOGS = f"{OUTPUT}"
-    IMGS = f"{OUTPUT}"
-    EXCEL = f"{OUTPUT}"
 
 
 class Timeouts(Enum):
@@ -54,7 +51,7 @@ logging.basicConfig(
 )
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
-log_file_name = f'{Dirs.LOGS.value}/log-file.log'
+log_file_name = f'{Dirs.OUTPUT.value}/log-file.log'
 os.makedirs(os.path.dirname(log_file_name), exist_ok=True)
 file_handler = logging.FileHandler(log_file_name, mode='a')
 file_handler.setLevel(logging.DEBUG)
@@ -249,14 +246,14 @@ class Robot(Bot):
     def __create_excel_file(self):
         file_name = self.start.strftime('%Y-%m-%d_%H-%M')
         sheet = os.getenv("SHEET_NAME", "data")
-        file = f"{Dirs.EXCEL.value}/{file_name}.xlsx"
+        file = f"{Dirs.OUTPUT.value}/{file_name}.xlsx"
         self.excel.create_workbook(
             path=file,
             sheet_name=sheet,
         )
         self.excel.append_rows_to_worksheet(
             name=sheet,
-            header=True,
+            header=False,
             content=[
                 [
                     "title",
@@ -272,7 +269,7 @@ class Robot(Bot):
         return file
 
     def __download_img(self, link, file_name):
-        img_dir = Path(Dirs.IMGS.value)
+        img_dir = Path(Dirs.OUTPUT.value)
         save_to = None
         att = 0
         for _ in range(Robot.RETRY_MAX):
