@@ -46,7 +46,7 @@ class Elements(Enum):
 
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
@@ -55,7 +55,7 @@ console_handler.setLevel(logging.INFO)
 log_file_name = f'{Dirs.OUTPUT.value}/log-file.log'
 os.makedirs(os.path.dirname(log_file_name), exist_ok=True)
 file_handler = logging.FileHandler(log_file_name, mode='a')
-file_handler.setLevel(logging.DEBUG)
+file_handler.setLevel(logging.INFO)
 
 
 class Robot(Bot):
