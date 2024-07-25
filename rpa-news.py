@@ -18,6 +18,7 @@ load_dotenv("config.env")
 
 class Dirs(Enum):
     OUTPUT = "output"
+    IMGS = f"{OUTPUT}/imgs"
 
 
 class Timeouts(Enum):
@@ -269,7 +270,7 @@ class Robot(Bot):
         return file
 
     def __download_img(self, link, file_name):
-        img_dir = Path(Dirs.OUTPUT.value)
+        img_dir = Path(Dirs.IMGS.value)
         save_to = None
         att = 0
         for _ in range(Robot.RETRY_MAX):
