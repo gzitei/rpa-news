@@ -18,9 +18,9 @@ load_dotenv('config.env')
 
 class Dirs(Enum):
     OUTPUT = "output"
-    LOGS = f"{OUTPUT}/logs"
-    IMGS = f"{OUTPUT}/imgs"
-    EXCEL = f"{OUTPUT}/excel"
+    LOGS = f"{OUTPUT}"
+    IMGS = f"{OUTPUT}"
+    EXCEL = f"{OUTPUT}"
 
 
 class Timeouts(Enum):
