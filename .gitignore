@@ -1,3 +1,4 @@
-./output/excel/*
-./output/imgs/*
-./output/logs/*
+output/excel/*
+output/imgs/*
+output/logs/*
+__pycache__/
