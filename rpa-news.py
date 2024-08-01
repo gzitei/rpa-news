@@ -9,8 +9,9 @@ import os
 import time
 from slugify import slugify
 from datetime import datetime
-from RPA.Browser.Selenium import Selenium
+from RPA.Browser.Selenium import Selenium, ElementNotFound
 from RPA.Excel.Files import Files
+from RPA.Robocorp.WorkItems import WorkItems
 from enum import Enum
 from dateutil.relativedelta import relativedelta
 load_dotenv("config.env")
@@ -36,13 +37,25 @@ class Timeouts(Enum):
 class Elements(Enum):
     SEARCH_ICON = "//header//div[contains(@class, 'search-trigger')]/button"
     FORM = "//form[@role='search']"
-    SEARCH_BAR = f"{FORM}//input[contains(@class, 'search-bar')]"
+    SEARCH_BAR = "//input[contains(@class, 'search-bar')]"
     SORT_SELECTION = "//select[@id='search-sort-option']"
     ARTICLE = "//article"
     SHOW_MORE = "//button[contains(@class, 'show-more-button')]"
     LOADING = "//div[@class='loading-animation']"
     FOOTER = "//footer[@class='site-footer']"
     RESULTS = "//div[@class='search-result__list']"
+
+
+class EnvSetupError(Exception):
+    pass
+
+
+class SortContentError(Exception):
+    pass
+
+
+class ProducerProcessError(Exception):
+    pass
 
 
 logging.basicConfig(
@@ -88,6 +101,7 @@ class Robot(Bot):
         self.chrome_opened = False
         self.excel_opened = False
         self.curr_idx = 1
+        self.wi = WorkItems()
 
     def retry(n=RETRY_MAX):
         def decorator(func):
@@ -128,7 +142,9 @@ class Robot(Bot):
         except Exception as e:
             Robot.LOGGER.error(f"Error setting up configs. {e}")
             Robot.LOGGER.error(traceback.print_exc())
-            raise e
+            raise EnvSetupError(
+                f"Error while setting up environment - {type(e)}: {e}"
+            )
 
     def set_env(self):
         try:
@@ -143,7 +159,9 @@ class Robot(Bot):
         except Exception as e:
             Robot.LOGGER.error(f"Error setting up environment. {e}")
             Robot.LOGGER.error(traceback.print_exc())
-            raise e
+            raise EnvSetupError(
+                f"Error while setting up environment - {type(e)}: {e}"
+            )
 
     def init(self):
         try:
@@ -156,7 +174,9 @@ class Robot(Bot):
         except Exception as e:
             Robot.LOGGER.error(f"Error initializing environment. {e}")
             Robot.LOGGER.error(traceback.print_exc())
-            raise e
+            raise EnvSetupError(
+                f"Error while setting up environment - {type(e)}: {e}"
+            )
 
     def get_work_item(self):
         pass
@@ -177,7 +197,7 @@ class Robot(Bot):
         try:
             self.init()
             ready = True
-        except Exception as e:
+        except EnvSetupError as e:
             Robot.LOGGER.error(f"Error initializing Environment. {e}")
 
         if ready:
@@ -204,7 +224,8 @@ class Robot(Bot):
         self.__input_search()
         self.__send_search_form()
         self.__sort_search_content()
-        self.__process_articles()
+        self.__producer()
+        self.__consumer()
 
     def finish_job(self):
         self.excel.save_workbook()
@@ -427,13 +448,17 @@ class Robot(Bot):
                 Elements.SORT_SELECTION.value
             ) == "date"
             Robot.LOGGER.info("Sorted results by date.")
-        except Exception as e:
+        except ElementNotFound as e:
             self.driver.reload_page()
             Robot.LOGGER.error(traceback.print_exc())
-            raise e
+            raise SortContentError(f"{type(e)}: {e}")
+
+        except Exception as e:
+            Robot.LOGGER.error(traceback.print_exc())
+            raise SortContentError(f"{type(e)}: {e}")
 
     @retry()
-    def __process_articles(self):
+    def __producer(self):
         try:
             self.driver.wait_until_page_contains_element(
                 locator=Elements.RESULTS.value,
@@ -451,15 +476,23 @@ class Robot(Bot):
                 obj = self.__get_article_info(article)
                 if obj is None:
                     continue
-                self.__add_data_to_excel(obj)
+                self.wi.create_output_work_item()
+                self.wi.set_work_item_payload(obj)
+                self.wi.save_work_item()
                 self.articles = self.article_counter()
-        except Exception as e:
+
+        except ElementNotFound as e:
             self.driver.reload_page()
             self.__reach_to_current_article()
             Robot.LOGGER.error(traceback.print_exc())
-            raise e
+            raise ProducerProcessError(f"{type(e)}: {e}")
 
-    def __add_data_to_excel(self, obj):
+        except Exception as e:
+            Robot.LOGGER.error(traceback.print_exc())
+            raise ProducerProcessError(f"{type(e)}: {e}")
+
+    def __add_data_to_excel(self, work_item):
+        obj = self.wi.get_work_item_payload()
         self.excel.append_rows_to_worksheet(
             name=self.sheet_name,
             content=[
@@ -500,7 +533,7 @@ class Robot(Bot):
                 f"{article}//footer//span[@aria-hidden]",
                 "innerText"
             )
-        except Exception:
+        except ElementNotFound:
             Robot.LOGGER.info(f"Article {link} is not news.")
             return None
         try:
@@ -554,6 +587,9 @@ class Robot(Bot):
             if not next:
                 break
         Robot.LOGGER.info(f"Reached page containing article {self.curr_idx}")
+
+    def __consumer(self):
+        self.wi.for_each_input_work_item(self.__add_data_to_excel)
 
 
 if __name__ == "__main__":
