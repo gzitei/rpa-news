@@ -12,3 +12,4 @@ dependencies:
       - requests==2.31.0
       - truststore==0.9.1
       - autopep8==2.3.1
+      - robocorp==2.1.0

@@ -11,7 +11,7 @@ from slugify import slugify
 from datetime import datetime
 from RPA.Browser.Selenium import Selenium, ElementNotFound
 from RPA.Excel.Files import Files
-from RPA.Robocorp.WorkItems import WorkItems
+from robocorp import workitems
 from enum import Enum
 from dateutil.relativedelta import relativedelta
 load_dotenv("config.env")
@@ -101,7 +101,7 @@ class Robot(Bot):
         self.chrome_opened = False
         self.excel_opened = False
         self.curr_idx = 1
-        self.wi = WorkItems()
+        self.wi = workitems
 
     def retry(n=RETRY_MAX):
         def decorator(func):
@@ -155,6 +155,7 @@ class Robot(Bot):
             self.__open_chrome()
             self.chrome_opened = True
             self.limit_date = self.__get_limit_date()
+            self.wi.inputs
             Robot.LOGGER.info("Environment set up.")
         except Exception as e:
             Robot.LOGGER.error(f"Error setting up environment. {e}")
@@ -415,11 +416,12 @@ class Robot(Bot):
                 }
             }
             Robot.LOGGER.debug("Browser options set up.")
-            self.driver.open_available_browser(
+            self.driver.open_browser(
+                browser="chrome",
                 url=self.url,
-                maximized=True,
                 options=opts
             )
+            self.driver.maximize_browser_window()
             Robot.LOGGER.debug("Browser opened")
             time.sleep(Timeouts.SECOND_10.value)
             assert self.__validate_url()
@@ -476,9 +478,7 @@ class Robot(Bot):
                 obj = self.__get_article_info(article)
                 if obj is None:
                     continue
-                self.wi.create_output_work_item()
-                self.wi.set_work_item_payload(obj)
-                self.wi.save_work_item()
+                self.wi.outputs.create(payload=obj)
                 self.articles = self.article_counter()
 
         except ElementNotFound as e:
@@ -491,8 +491,8 @@ class Robot(Bot):
             Robot.LOGGER.error(traceback.print_exc())
             raise ProducerProcessError(f"{type(e)}: {e}")
 
-    def __add_data_to_excel(self, work_item):
-        obj = self.wi.get_work_item_payload()
+    def __add_data_to_excel(self, obj):
+        slug = obj["slug"]
         self.excel.append_rows_to_worksheet(
             name=self.sheet_name,
             content=[
@@ -506,6 +506,7 @@ class Robot(Bot):
                 ]
             ]
         )
+        self.LOGGER.info(f"Added {slug} to excel file.")
 
     def __parse_date_string(self, date_str):
         regex = r"([0-9]{1,2} \b\w{3}\b [0-9]{4})"
@@ -589,7 +590,11 @@ class Robot(Bot):
         Robot.LOGGER.info(f"Reached page containing article {self.curr_idx}")
 
     def __consumer(self):
-        self.wi.for_each_input_work_item(self.__add_data_to_excel)
+        for item in self.wi.outputs:
+            payload = item.payload
+            self.LOGGER.info(f"Started {payload['slug']} work item.")
+            self.__add_data_to_excel(payload)
+            self.LOGGER.info(f"{payload['slug']} work item done.")
 
 
 if __name__ == "__main__":
