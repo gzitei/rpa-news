@@ -621,11 +621,17 @@ class Robot(Bot):
 
     def __consumer(self):
         for item in self.wi.inputs:
-            payload = item.payload
-            self.LOGGER.info(f"Started {payload['slug']} work item.")
-            self.__add_data_to_excel(payload)
-            self.LOGGER.info(f"{payload['slug']} work item done.")
-            item.done()
+            try:
+                payload = item.payload
+                self.LOGGER.info(f"Started {payload['slug']} work item.")
+                self.__add_data_to_excel(payload)
+                self.LOGGER.info(f"{payload['slug']} work item done.")
+                item.done()
+            except (ValueError, Exception) as e:
+                self.LOGGER.error(
+                    f"Error processing work item: {e}"
+                )
+                item.fail(type(e), 2, e)
 
 
 robot = Robot()
