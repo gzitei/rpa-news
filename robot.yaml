@@ -1,6 +1,8 @@
 tasks:
-  RPA news:
-    shell: python rpa-news.py
+  Producer Task:
+    shell: python -m robocorp.tasks run rpa-news.py -t run_producer
+  Consumer Task:
+    shell: python -m robocorp.tasks run rpa-news.py -t run_consumer
 
 environmentConfigs:
   - environment_windows_amd64_freeze.yaml

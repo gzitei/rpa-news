@@ -12,6 +12,7 @@ from datetime import datetime
 from RPA.Browser.Selenium import Selenium, ElementNotFound
 from RPA.Excel.Files import Files
 from robocorp import workitems
+from robocorp.tasks import task
 from enum import Enum
 from dateutil.relativedelta import relativedelta
 load_dotenv("config.env")
@@ -102,6 +103,7 @@ class Robot(Bot):
         self.excel_opened = False
         self.curr_idx = 1
         self.wi = workitems
+        self.current_wi = None
 
     def retry(n=RETRY_MAX):
         def decorator(func):
@@ -123,21 +125,10 @@ class Robot(Bot):
 
     def set_config(self):
         try:
-            q = os.getenv("QUERY", "")
-            retry = os.getenv("RETRY_MAX", Robot.RETRY_MAX)
-            self.sheet_name = os.getenv("SHEET_NAME", "data")
+            retry = os.getenv("RETRY_MAX", 3)
             self.RETRY_MAX = int(retry)
             self.url = os.getenv("URL")
-            self.query = slugify(q)
-            self.topic = os.getenv("TOPIC")
-            self.months = os.getenv("MONTHS")
             self.load_strategy = os.getenv("LOAD_STRATEGY", "normal")
-            print(
-                self.query,
-                self.months,
-                self.topic,
-                self.RETRY_MAX,
-                self.url)
             Robot.LOGGER.info("Variables and configs set up.")
         except Exception as e:
             Robot.LOGGER.error(f"Error setting up configs. {e}")
@@ -150,12 +141,10 @@ class Robot(Bot):
         try:
             self.set_config()
             self.__create_dirs()
-            self.excel_file = self.__create_excel_file()
             self.driver.close_all_browsers()
             self.__open_chrome()
             self.chrome_opened = True
             self.limit_date = self.__get_limit_date()
-            self.wi.inputs
             Robot.LOGGER.info("Environment set up.")
         except Exception as e:
             Robot.LOGGER.error(f"Error setting up environment. {e}")
@@ -164,13 +153,28 @@ class Robot(Bot):
                 f"Error while setting up environment - {type(e)}: {e}"
             )
 
-    def init(self):
+    def init_consumer(self):
         try:
-            self.set_env()
-            self.excel.close_workbook()
+            self.sheet_name = os.getenv("SHEET_NAME", "data")
+            self.excel_file = self.__create_excel_file()
             self.excel.open_workbook(self.excel_file)
             self.excel_opened = True
             self.excel.set_active_worksheet(self.sheet_name)
+        except Exception as e:
+            Robot.LOGGER.error(f"Error initializing environment. {e}")
+            Robot.LOGGER.error(traceback.print_exc())
+            raise EnvSetupError(
+                f"Error while setting up environment - {type(e)}: {e}"
+            )
+
+    def init(self):
+        try:
+            self.current_wi = self.wi.inputs.current
+            payload = self.current_wi.payload
+            self.query = slugify(payload["query"])
+            self.topic = payload["topic"]
+            self.months = int(payload["months"])
+            self.set_env()
             Robot.LOGGER.info("Environment initialized.")
         except Exception as e:
             Robot.LOGGER.error(f"Error initializing environment. {e}")
@@ -194,18 +198,43 @@ class Robot(Bot):
             self.finish_job_with_exception(e)
 
     def run(self):
+        pass
+
+    def run_producer(self):
         ready = False
         try:
             self.init()
             ready = True
         except EnvSetupError as e:
-            Robot.LOGGER.error(f"Error initializing Environment. {e}")
+            Robot.LOGGER.error(
+                f"Error initializing Environment for producer. {e}"
+            )
 
         if ready:
             try:
                 self.start_job()
+                self.current_wi.done()
             except Exception as e:
-                Robot.LOGGER.error(f"Error running job. {e}")
+                Robot.LOGGER.error(f"Error running producer job. {e}")
+                self.handle_exception(e)
+            else:
+                self.finish_job()
+
+    def run_consumer(self):
+        ready = False
+        try:
+            self.init_consumer()
+            ready = True
+        except EnvSetupError as e:
+            Robot.LOGGER.error(
+                f"Error initializing Environment for consumer. {e}"
+            )
+
+        if ready:
+            try:
+                self.__consumer()
+            except Exception as e:
+                Robot.LOGGER.error(f"Error running consumer job. {e}")
                 self.handle_exception(e)
             else:
                 self.finish_job()
@@ -219,19 +248,20 @@ class Robot(Bot):
 
     def start_job(self):
         Robot.LOGGER.info("Started job execution")
-        self.excel.open_workbook(self.excel_file)
-        Robot.LOGGER.info("Excel sheet opened")
         self.__click_search_icon()
         self.__input_search()
         self.__send_search_form()
         self.__sort_search_content()
         self.__producer()
-        self.__consumer()
 
     def finish_job(self):
-        self.excel.save_workbook()
-        self.excel.close_workbook()
-        self.driver.close_all_browsers()
+        if self.excel_opened:
+            self.excel.save_workbook()
+            self.excel.close_workbook()
+
+        if self.chrome_opened:
+            self.driver.close_all_browsers()
+
         Robot.LOGGER.info(
             f"Automation read {self.articles} articles"
         )
@@ -243,6 +273,7 @@ class Robot(Bot):
 
         if self.chrome_opened:
             self.driver.close_all_browsers()
+
         Robot.LOGGER.error(
             f"""After {self.error} attempts,
                 the job was finished with exception: {e}"""
@@ -416,8 +447,7 @@ class Robot(Bot):
                 }
             }
             Robot.LOGGER.debug("Browser options set up.")
-            self.driver.open_browser(
-                browser="chrome",
+            self.driver.open_available_browser(
                 url=self.url,
                 options=opts
             )
@@ -590,13 +620,22 @@ class Robot(Bot):
         Robot.LOGGER.info(f"Reached page containing article {self.curr_idx}")
 
     def __consumer(self):
-        for item in self.wi.outputs:
+        for item in self.wi.inputs:
             payload = item.payload
             self.LOGGER.info(f"Started {payload['slug']} work item.")
             self.__add_data_to_excel(payload)
             self.LOGGER.info(f"{payload['slug']} work item done.")
+            item.done()
 
 
-if __name__ == "__main__":
-    robot = Robot()
-    robot.run()
+robot = Robot()
+
+
+@task
+def run_producer():
+    robot.run_producer()
+
+
+@task
+def run_consumer():
+    robot.run_consumer()
