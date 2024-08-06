@@ -1,5 +1,9 @@
-[{"payload":{
-  "query": "stock market",
-  "topic": "economy",
-  "months": 4
-}}]
+[
+    {
+        "payload": {
+            "query": "stock market",
+            "topic": "economy",
+            "months": 4
+        }
+    }
+]
