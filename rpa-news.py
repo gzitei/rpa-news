@@ -106,7 +106,7 @@ class Consumer():
     def run(self):
         ready = False
         try:
-            self.init_consumer()
+            self.init()
             ready = True
         except EnvSetupError as e:
             self.LOGGER.error(
@@ -126,7 +126,7 @@ class Consumer():
         self.LOGGER.error(e)
         self.error = self.error_counter()
         if self.error < self.RETRY_MAX:
-            self.run_consumer()
+            self.run()
         else:
             self.finish_job_with_exception(e)
 
@@ -595,7 +595,7 @@ class Producer():
         self.LOGGER.error(e)
         self.error = self.error_counter()
         if self.error < self.RETRY_MAX:
-            self.run_producer()
+            self.run()
         else:
             self.finish_job_with_exception(e)
 

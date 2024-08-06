@@ -1,4 +1,2 @@
-output/excel/*
-output/imgs/*
-output/logs/*
-__pycache__/
+output/*
+__pycache__
