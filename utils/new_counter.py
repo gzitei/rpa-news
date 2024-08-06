@@ -1,7 +1,7 @@
-def counter():
-    count: int = -1
+def new_counter():
+    count: int = 0
 
-    def increment():
+    def increment() -> int:
         nonlocal count
         count += 1
         return count
